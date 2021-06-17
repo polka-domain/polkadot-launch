@@ -42,11 +42,18 @@
 			"bin": "./bin/polka-domain-collator",
 			"id": "200",
 			"balance": "1000000000000000000000",
+			"chain": "local",
 			"nodes": [
 				{
 					"wsPort": 9988,
 					"port": 31200,
 					"name": "alice",
+					"flags": ["--", "--execution=wasm"]
+				},
+				{
+					"wsPort": 9989,
+					"port": 31201,
+					"name": "bob",
 					"flags": ["--", "--execution=wasm"]
 				}
 			]
@@ -55,11 +62,18 @@
 			"bin": "./bin/polka-domain-collator",
 			"id": "300",
 			"balance": "1000000000000000000000",
+			"chain": "local",
 			"nodes": [
 				{
-					"wsPort": 9999,
+					"wsPort": 9998,
 					"port": 31300,
 					"name": "alice",
+					"flags": ["--", "--execution=wasm"]
+				},
+				{
+					"wsPort": 9999,
+					"port": 31301,
+					"name": "bob",
 					"flags": ["--", "--execution=wasm"]
 				}
 			]
