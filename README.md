@@ -45,8 +45,13 @@ polkadot-launch config.json
 ### Configuration File
 
 The required configuration file defines the properties of the network you want to set up.
+You may use a json or a js file.
 
-You can see an example [here](config.json).
+You can see the examples:
+- [config.json](config.json)
+- [config.js](config.js)
+
+You may find the .js alternative more convenient if you need comments, trailing commas or if you prefer do dedup some portions of the config.
 
 #### `relaychain`
 
@@ -57,8 +62,12 @@ You can see an example [here](config.json).
   - `name`: Must be one of `alice`, `bob`, `charlie`, or `dave`.
   - `wsPort`: The websocket port for this node.
   - `port`: The TCP port for this node.
-- `genesis`: A JSON object of the properties you want to modify from the genesis
-  configuration. Non-specified properties will be unchanged from the original genesis configuration.
+  - `nodeKey`: a secret key used for generating libp2p peer identifier. Optional.
+  - `basePath`: The directory used for the blockchain db and other outputs. When unspecified, we use
+    `--tmp`.
+  - `flags`: Any additional command line flags you want to add when starting your node.
+- `genesis`: A JSON object of the properties you want to modify from the genesis configuration.
+  Non-specified properties will be unchanged from the original genesis configuration.
 
 These variable are fed directly into the Polkadot binary and used to spawn a node:
 
@@ -77,7 +86,7 @@ An example of `genesis` is:
 "genesis": {
   "runtime": {
     "runtime_genesis_config": {
-      "parachainsConfiguration": {
+      "configuration": {
         "config": {
           "validation_upgrade_frequency": 1,
           "validation_upgrade_delay": 1
@@ -113,6 +122,9 @@ All `genesis` properties can be found in the chainspec output:
   account ID.
 - `chain`: (Optional) Configure an alternative chain specification to be used for launching the
   parachain.
+- `basePath`: The directory used for the blockchain db and other outputs. When unspecified, we use
+  `--tmp`.
+- `flags`: Any additional command line flags you want to add when starting your node.
 
 These variables are fed directly into the collator binary and used to spawn a node:
 
@@ -191,7 +203,7 @@ in order to create a local test network.
   node:
   - We build a fresh chain spec using the `chain` parameter specified in your config.
     - Includes the authorities you specified.
-    - Includes changes to the `parachainsConfiguration`.
+    - Includes changes to the `paras`.
     - Includes parachains you have added.
       - `wasm` is generated using the `<node> export-genesis-wasm` subcommand.
       - `header` is retrieved by calling `api.rpc.chain.getHeader(genesis_hash)`.

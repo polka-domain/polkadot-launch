@@ -5,6 +5,7 @@ import {
 } from "child_process";
 import util from "util";
 import fs from "fs";
+import { CollatorOptions } from "./types";
 
 // This tracks all the processes that we spawn from this file.
 // Used to clean up processes when exiting this program.
@@ -60,24 +61,68 @@ export async function generateChainSpecRaw(bin: string, chain: string) {
 	});
 }
 
+export async function getParachainIdFromSpec(
+	bin: string,
+	chain?: string
+): Promise<number> {
+	const data = await new Promise<string>(function (resolve, reject) {
+		let args = ["build-spec"];
+		if (chain) {
+			args.push("--chain=" + chain);
+		}
+
+		let data = "";
+
+		p["spec"] = spawn(bin, args);
+		p["spec"].stdout.on("data", (chunk) => {
+			data += chunk;
+		});
+
+		p["spec"].stderr.pipe(process.stderr);
+
+		p["spec"].on("close", () => {
+			resolve(data);
+		});
+
+		p["spec"].on("error", (err) => {
+			reject(err);
+		});
+	});
+
+	const spec = JSON.parse(data);
+	return spec.para_id;
+}
+
 // Spawn a new relay chain node.
 // `name` must be `alice`, `bob`, `charlie`, etc... (hardcoded in Substrate).
 export function startNode(
 	bin: string,
 	name: string,
 	wsPort: number,
+	rpcPort: number | undefined,
 	port: number,
+	nodeKey: string,
 	spec: string,
-	flags?: string[]
+	flags?: string[],
+	basePath?: string
 ) {
 	// TODO: Make DB directory configurable rather than just `tmp`
 	let args = [
 		"--chain=" + spec,
-		"--tmp",
 		"--ws-port=" + wsPort,
 		"--port=" + port,
+		"--node-key=" + nodeKey,
 		"--" + name.toLowerCase(),
 	];
+	if (rpcPort) {
+		args.push("--rpc-port=" + rpcPort);
+	}
+
+	if (basePath) {
+		args.push("--base-path=" + basePath);
+	} else {
+		args.push("--tmp");
+	}
 
 	if (flags) {
 		// Add any additional flags to the CLI
@@ -143,28 +188,47 @@ export function startCollator(
 	bin: string,
 	id: string,
 	wsPort: number,
+	rpcPort: number | undefined,
 	port: number,
-	name?: string,
-	chain?: string,
-	spec?: string,
-	flags?: string[]
+	options: CollatorOptions
 ) {
 	return new Promise<void>(function (resolve) {
 		// TODO: Make DB directory configurable rather than just `tmp`
-		let args = [
-			"--tmp",
-			"--ws-port=" + wsPort,
-			"--port=" + port,
-			"--parachain-id=" + id,
-			"--collator",
-			"--force-authoring",
-		];
+		let args = ["--ws-port=" + wsPort, "--port=" + port];
+		const {
+			basePath,
+			name,
+			skip_id_arg,
+			onlyOneParachainNode,
+			chain,
+			flags,
+			spec,
+		} = options;
+
+		if (rpcPort) {
+			args.push("--rpc-port=" + rpcPort);
+			console.log(`Added --rpc-port=" + ${rpcPort}`);
+		}
+		args.push("--collator");
+
+		if (basePath) {
+			args.push("--base-path=" + basePath);
+		} else {
+			args.push("--tmp");
+		}
 
 		if (name) {
 			args.push(`--${name.toLowerCase()}`);
 			console.log(`Added --${name.toLowerCase()}`);
 		}
-
+		if (!skip_id_arg) {
+			args.push("--parachain-id=" + id);
+			console.log(`Added --parachain-id=${id}`);
+		}
+		if (onlyOneParachainNode) {
+			args.push("--force-authoring");
+			console.log(`Added --force-authoring`);
+		}
 		if (chain) {
 			args.push("--chain=" + chain);
 			console.log(`Added --chain=${chain}`);
@@ -215,28 +279,30 @@ export function startSimpleCollator(
 	bin: string,
 	id: string,
 	spec: string,
-	port: string
+	port: string,
+	skip_id_arg?: boolean
 ) {
 	return new Promise<void>(function (resolve) {
 		let args = [
 			"--tmp",
-			"--parachain-id=" + id,
 			"--port=" + port,
 			"--chain=" + spec,
 			"--execution=wasm",
 		];
 
+		if (!skip_id_arg) {
+			args.push("--parachain-id=" + id);
+			console.log(`Added --parachain-id=${id}`);
+		}
+
 		p[port] = spawn(bin, args);
 
 		let log = fs.createWriteStream(`${port}.log`);
 
-		p[port].stdout.on("data", function (chunk) {
-			let message = chunk.toString();
-			log.write(message);
-		});
+		p[port].stdout.pipe(log);
 		p[port].stderr.on("data", function (chunk) {
 			let message = chunk.toString();
-			if (message.substring(21, 50) === "Listening for new connections") {
+			if (message.includes("Listening for new connections")) {
 				resolve();
 			}
 			log.write(message);
